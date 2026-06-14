@@ -683,47 +683,12 @@
     <button class="pwa-banner-close" id="pwaBannerClose">✕</button>
   </div>
 
-  <!-- LOGIN CONTAINER OVERLAY -->
-  <div id="loginOverlay" class="login-overlay" style="display: none;">
-    <div class="login-card">
-      <div class="login-header">
-        <div class="login-logo">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-            <path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>FinTrack</span>
-        </div>
-        <h2>Masuk ke Akun Anda</h2>
-        <p>Hubungkan laptop & HP untuk sinkronisasi data secara real-time</p>
-      </div>
-
-      <div class="auth-options">
-        <form id="emailLoginForm">
-          <div class="form-group">
-            <label for="loginEmail">Email</label>
-            <input type="email" id="loginEmail" placeholder="nama@email.com" required autocomplete="username" />
-          </div>
-          <div class="form-group" style="margin-bottom: 20px;">
-            <label for="loginPassword">Password</label>
-            <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password" />
-          </div>
-          <button type="submit" class="btn-primary btn-auth-submit" id="btnEmailLogin">Masuk</button>
-        </form>
-
-        <div class="auth-footer">
-          <p id="toggleAuthModeText">Belum punya akun? <a href="#" id="btnToggleAuthMode">Daftar Baru</a></p>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Firebase SDK Compat -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="firebase-config.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="firebase-config.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 
   <!-- Service Worker Registration -->
   <script>

@@ -1,5 +1,5 @@
 // FinTrack Service Worker — v2.0
-const CACHE_NAME = 'fintrack-v4';
+const CACHE_NAME = 'fintrack-v5';
 
 // Assets to cache for offline use
 const ASSETS = [

@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSearch();
   initDatePicker();
   initBackup();
-  initAuth();
+  // initAuth(); // Disabled as per user request to remove login system
 });
 
 // ===== DATA MANAGEMENT =====
