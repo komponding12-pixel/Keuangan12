@@ -40,6 +40,8 @@ let budgets      = [];
 let kantong      = [];          // wallet / pocket list
 let currentPage  = 'dashboard';
 let currentType  = 'pemasukan';
+let syncCode = null;
+const SYNC_KEY = 'fintrack_sync_code';
 let cashflowChart   = null;
 let categoryChart   = null;
 let reportBarChart  = null;
@@ -57,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSearch();
   initDatePicker();
   initBackup();
-  // initAuth(); // Disabled as per user request to remove login system
+  initSync();
 });
 
 // ===== DATA MANAGEMENT =====
@@ -79,13 +81,14 @@ function saveData()    { localStorage.setItem(DB_KEY,      JSON.stringify(transa
 function saveBudgets() { localStorage.setItem(BUDGET_KEY,  JSON.stringify(budgets));      }
 function saveKantong() { localStorage.setItem(KANTONG_KEY, JSON.stringify(kantong));      }
 
-function startSync(user) {
+function startSync() {
+  if (!db || !syncCode) return;
+  
   el('syncIndicator').style.display = 'flex';
   el('syncDot').className = 'sync-dot syncing';
   el('syncText').textContent = 'Sinkronisasi...';
 
-  // Listen to transactions
-  unsubscribeTx = db.collection('users').doc(user.uid).collection('transactions')
+  unsubscribeTx = db.collection('rooms').doc(syncCode).collection('transactions')
     .onSnapshot(snapshot => {
       transactions = [];
       snapshot.forEach(doc => {
@@ -106,8 +109,7 @@ function startSync(user) {
       console.error("Firestore tx listener error:", err);
     });
 
-  // Listen to budgets
-  unsubscribeBudgets = db.collection('users').doc(user.uid).collection('budgets')
+  unsubscribeBudgets = db.collection('rooms').doc(syncCode).collection('budgets')
     .onSnapshot(snapshot => {
       budgets = [];
       snapshot.forEach(doc => {
@@ -119,8 +121,7 @@ function startSync(user) {
       console.error("Firestore budgets listener error:", err);
     });
 
-  // Listen to kantong
-  unsubscribeKantong = db.collection('users').doc(user.uid).collection('kantong')
+  unsubscribeKantong = db.collection('rooms').doc(syncCode).collection('kantong')
     .onSnapshot(snapshot => {
       kantong = [];
       snapshot.forEach(doc => {
@@ -146,20 +147,21 @@ function updateSyncStatus() {
   el('syncText').textContent = 'Terhubung';
 }
 
-function checkAndUploadLocalData(uid) {
-  db.collection('users').doc(uid).collection('transactions').limit(1).get().then(snap => {
+function checkAndUploadLocalData() {
+  if (!db || !syncCode) return;
+  db.collection('rooms').doc(syncCode).collection('transactions').limit(1).get().then(snap => {
     if (snap.empty && (transactions.length > 0 || kantong.length > 0 || budgets.length > 0)) {
       console.log("Firestore is empty. Migrating local data...");
       
       const batch = db.batch();
       transactions.forEach(t => {
-        batch.set(db.collection('users').doc(uid).collection('transactions').doc(t.id), t);
+        batch.set(db.collection('rooms').doc(syncCode).collection('transactions').doc(t.id), t);
       });
       kantong.forEach(k => {
-        batch.set(db.collection('users').doc(uid).collection('kantong').doc(k.id), k);
+        batch.set(db.collection('rooms').doc(syncCode).collection('kantong').doc(k.id), k);
       });
       budgets.forEach(b => {
-        batch.set(db.collection('users').doc(uid).collection('budgets').doc(b.kategori), b);
+        batch.set(db.collection('rooms').doc(syncCode).collection('budgets').doc(b.kategori), b);
       });
       
       batch.commit().then(() => {
@@ -172,7 +174,6 @@ function checkAndUploadLocalData(uid) {
 }
 
 function addTransaction(data) {
-  const user = auth.currentUser;
   const tId = Date.now().toString() + Math.random().toString(36).substr(2,5);
   const t = {
     id: tId,
@@ -180,8 +181,8 @@ function addTransaction(data) {
     createdAt: new Date().toISOString()
   };
   
-  if (user) {
-    db.collection('users').doc(user.uid).collection('transactions').doc(tId).set(t)
+  if (syncCode && db) {
+    db.collection('rooms').doc(syncCode).collection('transactions').doc(tId).set(t)
       .catch(err => {
         console.error("Error adding to Firestore:", err);
         showToast("Gagal menyimpan ke cloud", "error");
@@ -196,9 +197,8 @@ function addTransaction(data) {
 }
 
 function deleteTransaction(id) {
-  const user = auth.currentUser;
-  if (user) {
-    db.collection('users').doc(user.uid).collection('transactions').doc(id).delete()
+  if (syncCode && db) {
+    db.collection('rooms').doc(syncCode).collection('transactions').doc(id).delete()
       .catch(err => {
         console.error("Error deleting from Firestore:", err);
         showToast("Gagal menghapus dari cloud", "error");
@@ -394,9 +394,8 @@ function renderKantongPage() {
   grid.querySelectorAll('[data-del]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (confirm('Hapus kantong ini? Transaksi yang terhubung tidak akan dihapus.')) {
-        const user = auth.currentUser;
-        if (user) {
-          db.collection('users').doc(user.uid).collection('kantong').doc(btn.dataset.del).delete()
+        if (syncCode && db) {
+          db.collection('rooms').doc(syncCode).collection('kantong').doc(btn.dataset.del).delete()
             .then(() => showToast('Kantong dihapus', 'info'))
             .catch(err => console.error("Error deleting kantong:", err));
         } else {
@@ -700,9 +699,8 @@ function renderBudgetPage() {
   container.innerHTML = html;
   container.querySelectorAll('.btn-delete-budget').forEach(btn => {
     btn.addEventListener('click',()=>{
-      const user = auth.currentUser;
-      if (user) {
-        db.collection('users').doc(user.uid).collection('budgets').doc(btn.dataset.kat).delete()
+      if (syncCode && db) {
+        db.collection('rooms').doc(syncCode).collection('budgets').doc(btn.dataset.kat).delete()
           .then(() => showToast('Anggaran dihapus', 'info'))
           .catch(err => console.error("Error deleting budget:", err));
       } else {
@@ -946,9 +944,8 @@ function initBudgetModal() {
     const kat=el('budgetKategori').value, limit=parseInt(el('budgetNominal').value.replace(/\D/g,''));
     if(!kat||!limit){ showToast('Lengkapi semua data','error'); return; }
     
-    const user = auth.currentUser;
-    if (user) {
-      db.collection('users').doc(user.uid).collection('budgets').doc(kat).set({
+    if (syncCode && db) {
+      db.collection('rooms').doc(syncCode).collection('budgets').doc(kat).set({
         kategori: kat,
         limit
       }).then(() => showToast('Anggaran berhasil diatur! ✓','success'))
@@ -1048,11 +1045,10 @@ function submitKantong() {
   if (!nama) { showToast('Masukkan nama kantong','error'); return; }
 
   const editId = el('kantongEditId').value;
-  const user = auth.currentUser;
 
-  if (user) {
+  if (syncCode && db) {
     if (editId) {
-      db.collection('users').doc(user.uid).collection('kantong').doc(editId).update({
+      db.collection('rooms').doc(syncCode).collection('kantong').doc(editId).update({
         nama,
         emoji: el('kantongEmoji').value,
         color: el('kantongColor').value,
@@ -1062,7 +1058,7 @@ function submitKantong() {
     } else {
       const id = Date.now().toString()+Math.random().toString(36).substr(2,4);
       const saldoAwal = parseInt(el('kantongSaldoAwal').value.replace(/\D/g,'')||'0');
-      db.collection('users').doc(user.uid).collection('kantong').doc(id).set({
+      db.collection('rooms').doc(syncCode).collection('kantong').doc(id).set({
         id,
         nama,
         emoji: el('kantongEmoji').value,
@@ -1268,7 +1264,6 @@ function handleImport(data) {
     ? new Date(data._exportedAt).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })
     : 'Tidak diketahui';
 
-  const user = auth.currentUser;
 
   // Show confirmation dialog
   showImportConfirm({
@@ -1277,7 +1272,7 @@ function handleImport(data) {
     ktCount : incomingKt.length,
     bgCount : incomingBg.length,
     onReplace: () => {
-      if (user) {
+      if (syncCode && db) {
         replaceFirestoreData(incomingTx, incomingKt, incomingBg);
       } else {
         // Full replace
@@ -1290,7 +1285,7 @@ function handleImport(data) {
       }
     },
     onMerge: () => {
-      if (user) {
+      if (syncCode && db) {
         mergeFirestoreData(incomingTx, incomingKt, incomingBg);
       } else {
         // Merge — skip duplicates by id
@@ -1317,8 +1312,7 @@ function handleImport(data) {
 }
 
 async function replaceFirestoreData(incomingTx, incomingKt, incomingBg) {
-  const user = auth.currentUser;
-  if (!user) return;
+  if (!syncCode || !db) return;
 
   showToast("Mengunggah data baru ke cloud...", "info");
 
@@ -1327,13 +1321,13 @@ async function replaceFirestoreData(incomingTx, incomingKt, incomingBg) {
 
     // 1. Delete all current (since they are in local arrays, we delete them)
     transactions.forEach(t => {
-      batch.delete(db.collection('users').doc(user.uid).collection('transactions').doc(t.id));
+      batch.delete(db.collection('rooms').doc(syncCode).collection('transactions').doc(t.id));
     });
     kantong.forEach(k => {
-      batch.delete(db.collection('users').doc(user.uid).collection('kantong').doc(k.id));
+      batch.delete(db.collection('rooms').doc(syncCode).collection('kantong').doc(k.id));
     });
     budgets.forEach(b => {
-      batch.delete(db.collection('users').doc(user.uid).collection('budgets').doc(b.kategori));
+      batch.delete(db.collection('rooms').doc(syncCode).collection('budgets').doc(b.kategori));
     });
 
     await batch.commit();
@@ -1343,7 +1337,7 @@ async function replaceFirestoreData(incomingTx, incomingKt, incomingBg) {
     let count = 0;
 
     for (const t of incomingTx) {
-      newBatch.set(db.collection('users').doc(user.uid).collection('transactions').doc(t.id), t);
+      newBatch.set(db.collection('rooms').doc(syncCode).collection('transactions').doc(t.id), t);
       count++;
       if (count === 400) {
         await newBatch.commit();
@@ -1353,7 +1347,7 @@ async function replaceFirestoreData(incomingTx, incomingKt, incomingBg) {
     }
 
     for (const k of incomingKt) {
-      newBatch.set(db.collection('users').doc(user.uid).collection('kantong').doc(k.id), k);
+      newBatch.set(db.collection('rooms').doc(syncCode).collection('kantong').doc(k.id), k);
       count++;
       if (count === 400) {
         await newBatch.commit();
@@ -1363,7 +1357,7 @@ async function replaceFirestoreData(incomingTx, incomingKt, incomingBg) {
     }
 
     for (const b of incomingBg) {
-      newBatch.set(db.collection('users').doc(user.uid).collection('budgets').doc(b.kategori), b);
+      newBatch.set(db.collection('rooms').doc(syncCode).collection('budgets').doc(b.kategori), b);
       count++;
       if (count === 400) {
         await newBatch.commit();
@@ -1384,8 +1378,7 @@ async function replaceFirestoreData(incomingTx, incomingKt, incomingBg) {
 }
 
 async function mergeFirestoreData(incomingTx, incomingKt, incomingBg) {
-  const user = auth.currentUser;
-  if (!user) return;
+  if (!syncCode || !db) return;
 
   showToast("Menggabungkan data ke cloud...", "info");
 
@@ -1400,7 +1393,7 @@ async function mergeFirestoreData(incomingTx, incomingKt, incomingBg) {
     let count = 0;
 
     for (const t of newTx) {
-      batch.set(db.collection('users').doc(user.uid).collection('transactions').doc(t.id), t);
+      batch.set(db.collection('rooms').doc(syncCode).collection('transactions').doc(t.id), t);
       count++;
       if (count === 400) {
         await batch.commit();
@@ -1410,7 +1403,7 @@ async function mergeFirestoreData(incomingTx, incomingKt, incomingBg) {
     }
 
     for (const k of newKt) {
-      batch.set(db.collection('users').doc(user.uid).collection('kantong').doc(k.id), k);
+      batch.set(db.collection('rooms').doc(syncCode).collection('kantong').doc(k.id), k);
       count++;
       if (count === 400) {
         await batch.commit();
@@ -1420,7 +1413,7 @@ async function mergeFirestoreData(incomingTx, incomingKt, incomingBg) {
     }
 
     for (const b of incomingBg) {
-      batch.set(db.collection('users').doc(user.uid).collection('budgets').doc(b.kategori), b);
+      batch.set(db.collection('rooms').doc(syncCode).collection('budgets').doc(b.kategori), b);
       count++;
       if (count === 400) {
         await batch.commit();
@@ -1507,138 +1500,74 @@ function showImportConfirm({ exportedAt, txCount, ktCount, bgCount, onReplace, o
   });
 }
 
-// ===== AUTHENTICATION SYSTEM =====
-let authMode = 'login'; // 'login' or 'register'
+// ===== SYNC SYSTEM (No Login Required) =====
+function generateSyncCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
 
-function initAuth() {
-  const loginOverlay = el('loginOverlay');
+function initSync() {
+  // Load or generate sync code
+  syncCode = localStorage.getItem(SYNC_KEY);
+  if (!syncCode) {
+    syncCode = generateSyncCode();
+    localStorage.setItem(SYNC_KEY, syncCode);
+  }
   
-  if (!auth) {
-    showToast("Koneksi Firebase gagal! Matikan adblocker Anda.", "error");
-    if (loginOverlay) {
-      loginOverlay.style.display = 'flex';
-      const header = loginOverlay.querySelector('.login-header');
-      if (header && !header.querySelector('.firebase-error-box')) {
-        header.innerHTML += `
-          <div class="firebase-error-box" style="background: rgba(244, 63, 94, 0.1); border: 1px solid var(--expense-color); color: var(--expense-color); padding: 16px; border-radius: var(--radius-md); margin-top: 20px; font-size: 13px; text-align: left; line-height: 1.5;">
-            <strong>⚠️ Firebase Gagal Dimuat!</strong><br>
-            Aplikasi tidak dapat terhubung ke server Google Firebase. Hal ini biasanya disebabkan oleh:
-            <ul style="margin: 6px 0 0 16px; padding: 0;">
-              <li>Adblocker (uBlock Origin, AdGuard, dll.) memblokir Google services.</li>
-              <li>DNS pemblokir iklan (NextDNS, Pi-hole).</li>
-              <li>Koneksi internet Anda sedang terganggu.</li>
-            </ul>
-            <p style="margin-top: 10px; font-weight: 600;">Solusi: Nonaktifkan adblocker/DNS pemblokir iklan Anda untuk situs ini, lalu refresh halaman (F5).</p>
-          </div>
-        `;
+  // Update sync code display in sidebar
+  const codeDisplay = el('syncCodeDisplay');
+  if (codeDisplay) codeDisplay.textContent = syncCode;
+
+  // Copy sync code button
+  const btnCopy = el('btnCopySyncCode');
+  btnCopy?.addEventListener('click', () => {
+    navigator.clipboard.writeText(syncCode).then(() => {
+      showToast('Kode disalin! Masukkan kode ini di perangkat lain.', 'success');
+    }).catch(() => {
+      // Fallback
+      prompt('Salin kode ini:', syncCode);
+    });
+  });
+
+  // Join sync code button
+  const btnJoin = el('btnJoinSync');
+  btnJoin?.addEventListener('click', () => {
+    const newCode = prompt('Masukkan Kode Sinkronisasi dari perangkat lain:');
+    if (newCode && newCode.trim().length >= 4) {
+      const cleanCode = newCode.trim().toUpperCase();
+      stopSync();
+      syncCode = cleanCode;
+      localStorage.setItem(SYNC_KEY, syncCode);
+      if (codeDisplay) codeDisplay.textContent = syncCode;
+      showToast('Kode diperbarui! Menyinkronkan data...', 'info');
+      
+      // Restart sync with new code
+      if (auth && db) {
+        checkAndUploadLocalData();
+        startSync();
       }
+    } else if (newCode !== null) {
+      showToast('Kode tidak valid. Minimal 4 karakter.', 'error');
     }
+  });
+
+  // Auto connect to Firebase
+  if (!auth) {
+    showToast('Firebase tidak tersedia. Data disimpan lokal saja.', 'info');
     return;
   }
 
-  const btnLogout = el('btnLogout');
-  const emailLoginForm = el('emailLoginForm');
-  const btnToggleAuthMode = el('btnToggleAuthMode');
-  const toggleAuthModeText = el('toggleAuthModeText');
-  const btnEmailLogin = el('btnEmailLogin');
-
-  // Listen to Auth State
-  auth.onAuthStateChanged(user => {
-    if (user) {
-      // Logged in
-      loginOverlay.style.display = 'none';
-      btnLogout.style.display = 'flex';
-      
-      // Update User Card
-      const name = user.displayName || user.email.split('@')[0];
-      el('userName').textContent = name;
-      el('userEmail').textContent = user.email;
-      el('userAvatar').textContent = name.charAt(0).toUpperCase();
-
-      // Start Sync
-      checkAndUploadLocalData(user.uid);
-      startSync(user);
-    } else {
-      // Logged out
-      loginOverlay.style.display = 'flex';
-      btnLogout.style.display = 'none';
-      el('syncIndicator').style.display = 'none';
-      
-      // Reset local arrays to avoid showing old user data
-      transactions = [];
-      kantong = [];
-      budgets = [];
-      renderAll();
-
-      stopSync();
-    }
-  });
-
-  // Toggle Auth Mode
-  btnToggleAuthMode?.addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleAuthMode();
-  });
-
-  function toggleAuthMode() {
-    const title = el('loginOverlay').querySelector('h2');
-    if (authMode === 'login') {
-      authMode = 'register';
-      toggleAuthModeText.innerHTML = 'Sudah punya akun? <a href="#" id="btnToggleAuthMode">Masuk di sini</a>';
-      btnEmailLogin.textContent = 'Daftar & Masuk';
-      title.textContent = 'Buat Akun Baru';
-    } else {
-      authMode = 'login';
-      toggleAuthModeText.innerHTML = 'Belum punya akun? <a href="#" id="btnToggleAuthMode">Daftar Baru</a>';
-      btnEmailLogin.textContent = 'Masuk';
-      title.textContent = 'Masuk ke Akun Anda';
-    }
-    // Rebind link
-    el('btnToggleAuthMode')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      toggleAuthMode();
-    });
-  }
-
-  // Email & Password Login / Register
-  emailLoginForm?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const email = el('loginEmail').value.trim();
-    const password = el('loginPassword').value;
-
-    if (authMode === 'login') {
-      auth.signInWithEmailAndPassword(email, password)
-        .catch(err => {
-          console.error("Login Error:", err);
-          alert("Error Login Email:\n" + err.message + "\n(Code: " + err.code + ")");
-          let msg = "Gagal masuk. Periksa kembali email dan password.";
-          if (err.code === 'auth/user-not-found') msg = "Akun tidak ditemukan.";
-          if (err.code === 'auth/wrong-password') msg = "Password salah.";
-          showToast(msg, 'error');
-        });
-    } else {
-      auth.createUserWithEmailAndPassword(email, password)
-        .then(() => {
-          showToast("Pendaftaran berhasil! ✓", "success");
-        })
-        .catch(err => {
-          console.error("Register Error:", err);
-          alert("Error Daftar Email:\n" + err.message + "\n(Code: " + err.code + ")");
-          let msg = "Gagal membuat akun.";
-          if (err.code === 'auth/email-already-in-use') msg = "Email sudah digunakan.";
-          if (err.code === 'auth/weak-password') msg = "Password terlalu lemah (min. 6 karakter).";
-          if (err.code === 'auth/invalid-email') msg = "Format email tidak valid.";
-          showToast(msg, 'error');
-        });
-    }
-  });
-
-  // Logout Button
-  btnLogout?.addEventListener('click', () => {
-    if (confirm("Apakah Anda yakin ingin keluar?")) {
-      auth.signOut().then(() => {
-        showToast("Berhasil keluar", "info");
-      });
-    }
+  // Sign in anonymously (invisible to user)
+  auth.signInAnonymously().then(() => {
+    console.log('Anonymous auth success');
+    checkAndUploadLocalData();
+    startSync();
+  }).catch(err => {
+    console.error('Anonymous auth failed:', err);
+    showToast('Koneksi cloud gagal. Data disimpan lokal.', 'info');
   });
 }
