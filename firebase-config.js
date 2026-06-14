@@ -1,11 +1,11 @@
 // Konfigurasi Firebase untuk FinTrack
 const firebaseConfig = {
-  apiKey: "AIzaSyB-Oc0zSRkveSh-BZH1SdbkVBlzSLfo_c4",
+  apiKey: "AIzaSyB-OcBrSrkveSh7BZHT5dbkV8IrBLfo_c4",
   authDomain: "keuangan121-87817.firebaseapp.com",
   projectId: "keuangan121-87817",
   storageBucket: "keuangan121-87817.firebasestorage.app",
-  messagingSenderId: "1014769970402",
-  appId: "1:1014769970402:web:4fb3d4ebae702ceb36633b",
+  messagingSenderId: "1014759970402",
+  appId: "1:1014759970402:web:4f53d4ebae702ceb36633b",
   measurementId: "G-VCJ3LB7SY4"
 };
 
