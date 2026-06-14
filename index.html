@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <script>
+    // Global Error Logger to show errors on screen
+    window.addEventListener('error', function(e) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'error-banner-screen';
+      errDiv.style.position = 'fixed';
+      errDiv.style.top = '0';
+      errDiv.style.left = '0';
+      errDiv.style.width = '100%';
+      errDiv.style.background = '#f43f5e';
+      errDiv.style.color = '#ffffff';
+      errDiv.style.padding = '14px 18px';
+      errDiv.style.zIndex = '9999999';
+      errDiv.style.fontSize = '13px';
+      errDiv.style.fontFamily = 'monospace';
+      errDiv.style.lineHeight = '1.4';
+      errDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+      errDiv.innerHTML = '<strong>[Error]</strong> ' + e.message + ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')';
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '✕';
+      closeBtn.style.float = 'right';
+      closeBtn.style.background = 'none';
+      closeBtn.style.border = 'none';
+      closeBtn.style.color = '#ffffff';
+      closeBtn.style.fontSize = '16px';
+      closeBtn.style.cursor = 'pointer';
+      closeBtn.onclick = function() { errDiv.remove(); };
+      errDiv.appendChild(closeBtn);
+      
+      document.body.appendChild(errDiv);
+    });
+
+    // Unhandled Promise Rejections (Firebase errors)
+    window.addEventListener('unhandledrejection', function(e) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'error-banner-screen-promise';
+      errDiv.style.position = 'fixed';
+      errDiv.style.bottom = '0';
+      errDiv.style.left = '0';
+      errDiv.style.width = '100%';
+      errDiv.style.background = '#f59e0b';
+      errDiv.style.color = '#111827';
+      errDiv.style.padding = '14px 18px';
+      errDiv.style.zIndex = '9999999';
+      errDiv.style.fontSize = '13px';
+      errDiv.style.fontFamily = 'monospace';
+      errDiv.style.lineHeight = '1.4';
+      errDiv.style.boxShadow = '0 -4px 12px rgba(0,0,0,0.3)';
+      
+      let msg = e.reason ? (e.reason.message || e.reason) : 'Unknown error';
+      errDiv.innerHTML = '<strong>[Firebase Error]</strong> ' + msg;
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '✕';
+      closeBtn.style.float = 'right';
+      closeBtn.style.background = 'none';
+      closeBtn.style.border = 'none';
+      closeBtn.style.color = '#111827';
+      closeBtn.style.fontSize = '16px';
+      closeBtn.style.cursor = 'pointer';
+      closeBtn.onclick = function() { errDiv.remove(); };
+      errDiv.appendChild(closeBtn);
+      
+      document.body.appendChild(errDiv);
+    });
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>FinTrack — Pencatatan Keuangan Pribadi</title>
+  <meta name="description" content="Aplikasi pencatatan keuangan pribadi yang cerdas. Pantau pemasukan, pengeluaran, dan tren keuangan Anda secara real-time." />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#7c3aed" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FinTrack" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css?v=2" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="logo-text">FinTrack</span>
+      </div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="Tutup menu">&#10005;</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+          <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+          <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+          <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-page="kantong" id="nav-kantong">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 12V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2v-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M16 12a2 2 0 100 4h5v-4h-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Kantong</span>
+        <span class="nav-badge" id="navKantongCount">0</span>
+      </a>
+      <a href="#" class="nav-item" data-page="transaksi" id="nav-transaksi">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
+          <path d="M9 12h6M9 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Transaksi</span>
+      </a>
+      <a href="#" class="nav-item" data-page="laporan" id="nav-laporan">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Laporan</span>
+      </a>
+      <a href="#" class="nav-item" data-page="anggaran" id="nav-anggaran">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Anggaran</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <!-- Sync Status Indicator -->
+      <div class="sync-indicator" id="syncIndicator" style="display: none; margin-bottom: 12px; margin-right: 0;">
+        <span class="sync-dot online" id="syncDot"></span>
+        <span id="syncText">Terhubung</span>
+      </div>
+      <div class="user-card">
+        <div class="user-avatar" id="userAvatar">M</div>
+        <div class="user-info">
+          <div class="user-name" id="userName">My Finance</div>
+          <div class="user-plan" id="userEmail">Personal</div>
+        </div>
+        <button class="btn-logout" id="btnLogout" title="Keluar Akun" style="display: none;">
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <!-- Backup & Restore -->
+      <div class="backup-bar">
+        <button class="backup-btn" id="btnExport" title="Export data ke file JSON">
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+            <path d="M12 15V3m0 12l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17v2a2 2 0 002 2h16a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Export Backup
+        </button>
+        <button class="backup-btn backup-btn-import" id="btnImport" title="Import data dari file JSON">
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+            <path d="M12 9v12m0-12l-4 4m4-4l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17v2a2 2 0 002 2h16a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Import Data
+        </button>
+        <input type="file" id="importFileInput" accept=".json" style="display:none" />
+      </div>
+    </div>
+  </aside>
+
+  <!-- OVERLAY -->
+  <div class="overlay" id="overlay"></div>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="topbar-title" id="pageTitle">Dashboard</div>
+      <div class="topbar-actions">
+        <div class="current-date" id="currentDate"></div>
+        <button class="btn-primary btn-add-top" id="btnAddTopbar" aria-label="Tambah transaksi">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          Tambah
+        </button>
+      </div>
+    </header>
+
+    <!-- PAGE: DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <!-- Balance Hero -->
+      <div class="balance-hero">
+        <div class="balance-hero-content">
+          <p class="balance-label">Total Saldo Semua Kantong</p>
+          <h1 class="balance-amount" id="totalSaldo">Rp 0</h1>
+          <div class="balance-trend" id="balanceTrend">
+            <span class="trend-icon">📈</span>
+            <span id="trendText">Mulai mencatat keuangan Anda</span>
+          </div>
+        </div>
+        <div class="balance-hero-visual">
+          <div class="hero-circle hero-circle-1"></div>
+          <div class="hero-circle hero-circle-2"></div>
+          <div class="hero-circle hero-circle-3"></div>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="cards-grid">
+        <div class="summary-card card-income">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="card-content">
+            <p class="card-label">Total Pemasukan</p>
+            <p class="card-value" id="totalPemasukan">Rp 0</p>
+            <p class="card-sub" id="countPemasukan">0 transaksi</p>
+          </div>
+        </div>
+
+        <div class="summary-card card-expense">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M17 7L7 17M7 17H17M7 17V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="card-content">
+            <p class="card-label">Total Pengeluaran</p>
+            <p class="card-value" id="totalPengeluaran">Rp 0</p>
+            <p class="card-sub" id="countPengeluaran">0 transaksi</p>
+          </div>
+        </div>
+
+        <div class="summary-card card-saving">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 4v4m0 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="card-content">
+            <p class="card-label">Tabungan Bersih</p>
+            <p class="card-value" id="tabunganBersih">Rp 0</p>
+            <p class="card-sub" id="savingsPercent">0% dari pemasukan</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kantong Mini Preview -->
+      <div class="kantong-mini-section" id="kantongMiniSection" style="display:none">
+        <div class="section-header">
+          <h3>🪙 Kantong Saya</h3>
+          <button class="btn-link" id="viewKantongBtn">Kelola Kantong →</button>
+        </div>
+        <div class="kantong-mini-list" id="kantongMiniList"></div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <div class="chart-card chart-main">
+          <div class="chart-header">
+            <h3>Arus Kas Bulanan</h3>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot income-dot"></span>Pemasukan</span>
+              <span class="legend-item"><span class="legend-dot expense-dot"></span>Pengeluaran</span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="cashflowChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card chart-side">
+          <div class="chart-header">
+            <h3>Kategori Pengeluaran</h3>
+          </div>
+          <div class="chart-container doughnut-container">
+            <canvas id="categoryChart"></canvas>
+          </div>
+          <div class="doughnut-legend" id="doughnutLegend"></div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions on Dashboard -->
+      <div class="recent-section">
+        <div class="section-header">
+          <h3>Transaksi Terbaru</h3>
+          <button class="btn-link" id="viewAllBtn">Lihat Semua →</button>
+        </div>
+        <div class="transaction-list" id="recentTransactions">
+          <div class="empty-state">
+            <div class="empty-icon">💸</div>
+            <p>Belum ada transaksi</p>
+            <span>Klik tombol "Tambah" untuk mulai mencatat</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE: KANTONG -->
+    <section class="page" id="page-kantong">
+      <div class="kantong-page-header">
+        <div>
+          <p class="kantong-page-subtitle">Kelola kantong keuangan terpisah — dompet, rekening, tabungan, dll.</p>
+          <div class="kantong-total-row">
+            <span class="kantong-total-label">Total semua kantong:</span>
+            <span class="kantong-total-value" id="kantongTotalAll">Rp 0</span>
+          </div>
+        </div>
+        <button class="btn-primary" id="btnAddKantong">
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          Tambah Kantong
+        </button>
+      </div>
+
+      <div class="kantong-grid" id="kantongGrid">
+        <div class="empty-state">
+          <div class="empty-icon">👛</div>
+          <p>Belum ada kantong</p>
+          <span>Buat kantong untuk memisahkan keuangan (dompet, rekening, dll.)</span>
+        </div>
+      </div>
+
+      <!-- Transfer antar kantong -->
+      <div class="transfer-section" id="transferSection" style="display:none">
+        <div class="section-header">
+          <h3>🔄 Transfer Antar Kantong</h3>
+        </div>
+        <div class="transfer-form-inline">
+          <div class="transfer-field">
+            <label>Dari Kantong</label>
+            <select id="transferDari" class="filter-select"></select>
+          </div>
+          <div class="transfer-arrow">→</div>
+          <div class="transfer-field">
+            <label>Ke Kantong</label>
+            <select id="transferKe" class="filter-select"></select>
+          </div>
+          <div class="transfer-field">
+            <label>Jumlah</label>
+            <div class="input-prefix-wrapper" style="min-width:160px">
+              <span class="input-prefix">Rp</span>
+              <input type="text" id="transferNominal" placeholder="0" class="input-nominal" inputmode="numeric" />
+            </div>
+          </div>
+          <button class="btn-primary" id="btnDoTransfer">Transfer</button>
+        </div>
+      </div>
+
+      <!-- Riwayat Transaksi per Kantong -->
+      <div class="kantong-tx-section" id="kantongTxSection" style="display:none">
+        <div class="section-header" style="margin-bottom:12px">
+          <h3>Transaksi per Kantong</h3>
+          <select id="filterKantongTx" class="filter-select"></select>
+        </div>
+        <div class="transaction-list all-transactions" id="kantongTxList"></div>
+      </div>
+    </section>
+
+    <!-- PAGE: TRANSAKSI -->
+    <section class="page" id="page-transaksi">
+      <div class="page-toolbar">
+        <div class="search-bar">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+            <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <input type="text" id="searchInput" placeholder="Cari transaksi..." />
+        </div>
+        <div class="filter-group">
+          <select id="filterType" class="filter-select">
+            <option value="all">Semua Tipe</option>
+            <option value="pemasukan">Pemasukan</option>
+            <option value="pengeluaran">Pengeluaran</option>
+          </select>
+          <select id="filterKategori" class="filter-select">
+            <option value="all">Semua Kategori</option>
+          </select>
+          <select id="filterBulan" class="filter-select">
+            <option value="all">Semua Bulan</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="transaction-table-wrapper">
+        <div class="transaction-list all-transactions" id="allTransactions">
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <p>Belum ada transaksi</p>
+            <span>Klik tombol "Tambah" untuk mulai mencatat</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE: LAPORAN -->
+    <section class="page" id="page-laporan">
+      <div class="report-period-selector">
+        <label>Periode Laporan:</label>
+        <select id="reportPeriod" class="filter-select">
+          <option value="bulan">Bulan Ini</option>
+          <option value="3bulan">3 Bulan Terakhir</option>
+          <option value="tahun">Tahun Ini</option>
+          <option value="all">Semua Waktu</option>
+        </select>
+      </div>
+
+      <div class="report-stats-grid">
+        <div class="report-stat-card">
+          <div class="rsc-icon income">↑</div>
+          <div class="rsc-content">
+            <div class="rsc-label">Pemasukan</div>
+            <div class="rsc-value" id="reportPemasukan">Rp 0</div>
+          </div>
+        </div>
+        <div class="report-stat-card">
+          <div class="rsc-icon expense">↓</div>
+          <div class="rsc-content">
+            <div class="rsc-label">Pengeluaran</div>
+            <div class="rsc-value" id="reportPengeluaran">Rp 0</div>
+          </div>
+        </div>
+        <div class="report-stat-card">
+          <div class="rsc-icon saving">≈</div>
+          <div class="rsc-content">
+            <div class="rsc-label">Net Savings</div>
+            <div class="rsc-value" id="reportSavings">Rp 0</div>
+          </div>
+        </div>
+        <div class="report-stat-card">
+          <div class="rsc-icon count">Σ</div>
+          <div class="rsc-content">
+            <div class="rsc-label">Total Transaksi</div>
+            <div class="rsc-value" id="reportCount">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card" style="flex:1">
+          <div class="chart-header"><h3>Tren Pengeluaran Per Kategori</h3></div>
+          <div class="chart-container">
+            <canvas id="reportBarChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card chart-side">
+          <div class="chart-header"><h3>Distribusi Pemasukan vs Pengeluaran</h3></div>
+          <div class="chart-container doughnut-container">
+            <canvas id="reportPieChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE: ANGGARAN -->
+    <section class="page" id="page-anggaran">
+      <div class="budget-header-row">
+        <p class="budget-subtitle">Atur batas pengeluaran per kategori setiap bulan</p>
+        <button class="btn-primary" id="btnSetBudget">+ Atur Anggaran</button>
+      </div>
+      <div class="budget-list" id="budgetList">
+        <div class="empty-state">
+          <div class="empty-icon">🎯</div>
+          <p>Belum ada anggaran</p>
+          <span>Klik "Atur Anggaran" untuk menetapkan batas pengeluaran</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: Tambah Transaksi -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Tambah Transaksi</h2>
+        <button class="modal-close" id="modalClose" aria-label="Tutup">&#10005;</button>
+      </div>
+
+      <div class="type-toggle">
+        <button class="type-btn active" id="btnPemasukan" data-type="pemasukan">
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+            <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Pemasukan
+        </button>
+        <button class="type-btn" id="btnPengeluaran" data-type="pengeluaran">
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+            <path d="M17 7L7 17M7 17H17M7 17V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Pengeluaran
+        </button>
+      </div>
+
+      <form id="transactionForm">
+        <input type="hidden" id="transactionId" />
+        <input type="hidden" id="transactionType" value="pemasukan" />
+
+        <div class="form-group">
+          <label for="inputNominal">Nominal</label>
+          <div class="input-prefix-wrapper">
+            <span class="input-prefix">Rp</span>
+            <input type="text" id="inputNominal" placeholder="0" class="input-nominal" inputmode="numeric" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputDeskripsi">Deskripsi</label>
+          <input type="text" id="inputDeskripsi" placeholder="Contoh: Gaji bulanan, Makan siang..." required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="inputKategori">Kategori</label>
+            <select id="inputKategori" required>
+              <option value="">-- Pilih Kategori --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="inputKantong">Kantong</label>
+            <select id="inputKantong">
+              <option value="">— Tanpa Kantong —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Tanggal</label>
+          <!-- Clickable date wrapper — klik di mana saja untuk buka date picker -->
+          <div class="date-picker-wrapper" id="datepickerWrapper">
+            <svg viewBox="0 0 24 24" fill="none" width="18" height="18" class="date-icon">
+              <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span class="date-display" id="dateDisplay">Pilih tanggal</span>
+            <input type="date" id="inputTanggal" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputCatatan">Catatan (opsional)</label>
+          <textarea id="inputCatatan" placeholder="Tambahkan catatan..." rows="2"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btnCancelForm">Batal</button>
+          <button type="submit" class="btn-primary" id="btnSubmitForm">Simpan Transaksi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Atur Anggaran -->
+  <div class="modal-overlay" id="budgetModalOverlay">
+    <div class="modal" id="budgetModal">
+      <div class="modal-header">
+        <h2 class="modal-title">Atur Anggaran</h2>
+        <button class="modal-close" id="budgetModalClose">&#10005;</button>
+      </div>
+      <form id="budgetForm">
+        <div class="form-group">
+          <label>Kategori</label>
+          <select id="budgetKategori" required>
+            <option value="">-- Pilih Kategori Pengeluaran --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Batas Anggaran Bulanan</label>
+          <div class="input-prefix-wrapper">
+            <span class="input-prefix">Rp</span>
+            <input type="text" id="budgetNominal" placeholder="0" class="input-nominal" inputmode="numeric" required />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btnCancelBudget">Batal</button>
+          <button type="submit" class="btn-primary">Simpan Anggaran</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Tambah / Edit Kantong -->
+  <div class="modal-overlay" id="kantongModalOverlay">
+    <div class="modal" id="kantongModal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="kantongModalTitle">Tambah Kantong</h2>
+        <button class="modal-close" id="kantongModalClose">&#10005;</button>
+      </div>
+      <form id="kantongForm">
+        <input type="hidden" id="kantongEditId" />
+        <div class="form-group">
+          <label>Nama Kantong</label>
+          <input type="text" id="kantongNama" placeholder="Contoh: Dompet, BCA, Dana Darurat..." required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Ikon</label>
+            <div class="emoji-picker" id="emojiPicker">
+              <span class="emoji-opt active" data-emoji="👛">👛</span>
+              <span class="emoji-opt" data-emoji="💳">💳</span>
+              <span class="emoji-opt" data-emoji="🏦">🏦</span>
+              <span class="emoji-opt" data-emoji="💵">💵</span>
+              <span class="emoji-opt" data-emoji="🪙">🪙</span>
+              <span class="emoji-opt" data-emoji="💰">💰</span>
+              <span class="emoji-opt" data-emoji="🏧">🏧</span>
+              <span class="emoji-opt" data-emoji="📱">📱</span>
+              <span class="emoji-opt" data-emoji="🛒">🛒</span>
+              <span class="emoji-opt" data-emoji="🎯">🎯</span>
+            </div>
+            <input type="hidden" id="kantongEmoji" value="👛" />
+          </div>
+          <div class="form-group">
+            <label>Warna</label>
+            <div class="color-picker" id="colorPicker">
+              <span class="color-opt active" data-color="#7c3aed" style="background:#7c3aed"></span>
+              <span class="color-opt" data-color="#06b6d4" style="background:#06b6d4"></span>
+              <span class="color-opt" data-color="#10b981" style="background:#10b981"></span>
+              <span class="color-opt" data-color="#f59e0b" style="background:#f59e0b"></span>
+              <span class="color-opt" data-color="#f43f5e" style="background:#f43f5e"></span>
+              <span class="color-opt" data-color="#8b5cf6" style="background:#8b5cf6"></span>
+              <span class="color-opt" data-color="#0ea5e9" style="background:#0ea5e9"></span>
+              <span class="color-opt" data-color="#ec4899" style="background:#ec4899"></span>
+            </div>
+            <input type="hidden" id="kantongColor" value="#7c3aed" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Saldo Awal</label>
+          <div class="input-prefix-wrapper">
+            <span class="input-prefix">Rp</span>
+            <input type="text" id="kantongSaldoAwal" placeholder="0" class="input-nominal" inputmode="numeric" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="kantongCatatan">Deskripsi (opsional)</label>
+          <input type="text" id="kantongCatatan" placeholder="Contoh: Rekening utama BCA" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btnCancelKantong">Batal</button>
+          <button type="submit" class="btn-primary" id="btnSubmitKantong">Simpan Kantong</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- PWA Install Banner -->
+  <div class="pwa-banner" id="pwaBanner">
+    <div class="pwa-banner-icon">📲</div>
+    <div class="pwa-banner-text">
+      <strong>Install FinTrack</strong>
+      <span>Tambahkan ke layar utama HP Anda</span>
+    </div>
+    <button class="pwa-banner-btn" id="pwaBannerInstall">Install</button>
+    <button class="pwa-banner-close" id="pwaBannerClose">✕</button>
+  </div>
+
+  <!-- LOGIN CONTAINER OVERLAY -->
+  <div id="loginOverlay" class="login-overlay" style="display: none;">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>FinTrack</span>
+        </div>
+        <h2>Masuk ke Akun Anda</h2>
+        <p>Hubungkan laptop & HP untuk sinkronisasi data secara real-time</p>
+      </div>
+
+      <div class="auth-options">
+        <!-- Google Login Option -->
+        <button class="btn-auth btn-google" id="btnGoogleLogin">
+          <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Masuk dengan Google
+        </button>
+
+        <div class="auth-divider">
+          <span>atau gunakan Email & Password</span>
+        </div>
+
+        <form id="emailLoginForm">
+          <div class="form-group">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" placeholder="nama@email.com" required autocomplete="username" />
+          </div>
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+          <button type="submit" class="btn-primary btn-auth-submit" id="btnEmailLogin">Masuk</button>
+        </form>
+
+        <div class="auth-footer">
+          <p id="toggleAuthModeText">Belum punya akun? <a href="#" id="btnToggleAuthMode">Daftar Baru</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK Compat -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js?v=3"></script>
+  <script src="app.js?v=3"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW registered:', reg.scope))
+          .catch(err => console.warn('SW registration failed:', err));
+      });
+    }
+
+    // PWA Install prompt
+    let deferredPrompt;
+    const banner   = document.getElementById('pwaBanner');
+    const btnInstall = document.getElementById('pwaBannerInstall');
+    const btnClose   = document.getElementById('pwaBannerClose');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (banner) banner.classList.add('show');
+    });
+
+    btnInstall?.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') banner.classList.remove('show');
+      deferredPrompt = null;
+    });
+
+    btnClose?.addEventListener('click', () => {
+      banner.classList.remove('show');
+    });
+
+    window.addEventListener('appinstalled', () => {
+      if (banner) banner.classList.remove('show');
+      deferredPrompt = null;
+    });
+  </script>
+</body>
+</html>
